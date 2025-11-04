@@ -1,12 +1,20 @@
 import React, { useMemo, useState } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useCustomFolders } from '@/contexts/CustomFoldersContext';
-import { FolderPlus, Save, Trash2, Plus, Edit3, ArrowUp, ArrowDown, X, Palette } from 'lucide-react';
+import { FolderPlus, Save, Trash2, Plus, Edit3, ArrowUp, ArrowDown, X, Palette, ExternalLink } from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
 }
+
+// normaliza https://
+const normalizeUrl = (raw: string) => {
+  const s = (raw || '').trim();
+  if (!s) return '';
+  if (/^https?:\/\//i.test(s)) return s;
+  return `https://${s}`;
+};
 
 export default function FolderManagementModal({ isOpen, onClose }: Props) {
   const { theme } = useTheme();
@@ -38,12 +46,14 @@ export default function FolderManagementModal({ isOpen, onClose }: Props) {
   // criação/edição de app
   const [newAppName, setNewAppName] = useState('');
   const [newAppDesc, setNewAppDesc] = useState('');
+  const [newAppUrl, setNewAppUrl] = useState(''); // novo
+
   const [editingAppId, setEditingAppId] = useState<string | null>(null);
   const [editAppName, setEditAppName] = useState('');
   const [editAppDesc, setEditAppDesc] = useState('');
+  const [editAppUrl, setEditAppUrl] = useState(''); // novo
 
   React.useEffect(() => {
-    // ao mudar pasta selecionada, carrega valores de edição
     if (selectedFolder) {
       setEditFolderName(selectedFolder.name);
       setEditFolderColor(selectedFolder.color);
@@ -80,10 +90,11 @@ export default function FolderManagementModal({ isOpen, onClose }: Props) {
     }
   };
 
-  const startEditApp = (appId: string, name: string, description: string) => {
+  const startEditApp = (appId: string, name: string, description: string, url: string) => {
     setEditingAppId(appId);
     setEditAppName(name);
     setEditAppDesc(description);
+    setEditAppUrl(url || '');
   };
 
   const saveEditApp = () => {
@@ -91,23 +102,31 @@ export default function FolderManagementModal({ isOpen, onClose }: Props) {
     updateAppInFolder(selectedFolder.id, editingAppId, {
       name: editAppName.trim() || '(Sem nome)',
       description: editAppDesc.trim(),
+      url: normalizeUrl(editAppUrl),
     });
     setEditingAppId(null);
     setEditAppName('');
     setEditAppDesc('');
+    setEditAppUrl('');
   };
 
   const cancelEditApp = () => {
     setEditingAppId(null);
     setEditAppName('');
     setEditAppDesc('');
+    setEditAppUrl('');
   };
 
   const addApp = () => {
     if (!selectedFolder || !newAppName.trim()) return;
-    addAppToFolder(selectedFolder.id, { name: newAppName.trim(), description: newAppDesc.trim() });
+    addAppToFolder(selectedFolder.id, {
+      name: newAppName.trim(),
+      description: newAppDesc.trim(),
+      url: normalizeUrl(newAppUrl),
+    });
     setNewAppName('');
     setNewAppDesc('');
+    setNewAppUrl('');
   };
 
   const delApp = (appId: string, appName: string) => {
@@ -115,6 +134,12 @@ export default function FolderManagementModal({ isOpen, onClose }: Props) {
     if (window.confirm(`Remover o app “${appName}” desta pasta?`)) {
       deleteAppFromFolder(selectedFolder.id, appId);
     }
+  };
+
+  const openApp = (url: string) => {
+    const u = normalizeUrl(url);
+    if (!u) return;
+    window.open(u, '_blank', 'noopener,noreferrer');
   };
 
   const moveApp = (index: number, dir: -1 | 1) => {
@@ -285,6 +310,13 @@ export default function FolderManagementModal({ isOpen, onClose }: Props) {
                                 rows={2}
                                 style={{ borderColor: borderCol, background: theme === 'light' ? 'rgba(0,0,0,.035)' : 'rgba(255,255,255,.04)', color: textCol }}
                               />
+                              <input
+                                className="w-full rounded-lg px-3 py-2 border text-sm"
+                                placeholder="URL (https://...)"
+                                value={editAppUrl}
+                                onChange={(e) => setEditAppUrl(e.target.value)}
+                                style={{ borderColor: borderCol, background: theme === 'light' ? 'rgba(0,0,0,.035)' : 'rgba(255,255,255,.04)', color: textCol }}
+                              />
                               <div className="flex items-center gap-2">
                                 <button onClick={saveEditApp} className="inline-flex items-center gap-2 rounded-lg px-3 py-2 border text-sm hover:opacity-90" style={{ borderColor: borderCol }}>
                                   <Save className="h-4 w-4" /> Salvar
@@ -299,11 +331,15 @@ export default function FolderManagementModal({ isOpen, onClose }: Props) {
                               <div>
                                 <div className="font-medium">{app.name}</div>
                                 <div className="text-sm" style={{ color: muted }}>{app.description || '—'}</div>
+                                {app.url ? <div className="text-xs" style={{ color: muted }}>{app.url}</div> : null}
                               </div>
                               <div className="flex items-center gap-2">
+                                <button onClick={() => openApp(app.url)} className="rounded-lg p-2 border hover:opacity-90" style={{ borderColor: borderCol }} title="Abrir">
+                                  <ExternalLink className="h-4 w-4" />
+                                </button>
                                 <button onClick={() => moveApp(idx, -1)} className="rounded-lg p-2 border hover:opacity-90" style={{ borderColor: borderCol }} aria-label="Mover para cima"><ArrowUp className="h-4 w-4" /></button>
                                 <button onClick={() => moveApp(idx, 1)} className="rounded-lg p-2 border hover:opacity-90" style={{ borderColor: borderCol }} aria-label="Mover para baixo"><ArrowDown className="h-4 w-4" /></button>
-                                <button onClick={() => startEditApp(app.id, app.name, app.description)} className="rounded-lg p-2 border hover:opacity-90" style={{ borderColor: borderCol }} aria-label="Editar app"><Edit3 className="h-4 w-4" /></button>
+                                <button onClick={() => startEditApp(app.id, app.name, app.description, app.url)} className="rounded-lg p-2 border hover:opacity-90" style={{ borderColor: borderCol }} aria-label="Editar app"><Edit3 className="h-4 w-4" /></button>
                                 <button onClick={() => delApp(app.id, app.name)} className="rounded-lg p-2 border border-red-500/30 text-red-500 hover:bg-red-500/10" aria-label="Excluir app"><Trash2 className="h-4 w-4" /></button>
                               </div>
                             </div>
@@ -317,27 +353,36 @@ export default function FolderManagementModal({ isOpen, onClose }: Props) {
                   <div className="pt-2 border-t" style={{ borderColor: borderCol }}>
                     <div className="grid grid-cols-12 gap-2 mt-3">
                       <input
-                        className="col-span-5 rounded-lg px-3 py-2 border text-sm"
+                        className="col-span-4 rounded-lg px-3 py-2 border text-sm"
                         placeholder="Nome do app"
                         value={newAppName}
                         onChange={(e) => setNewAppName(e.target.value)}
                         style={{ borderColor: borderCol, background: theme === 'light' ? 'rgba(0,0,0,.035)' : 'rgba(255,255,255,.04)', color: textCol }}
                       />
                       <input
-                        className="col-span-6 rounded-lg px-3 py-2 border text-sm"
+                        className="col-span-5 rounded-lg px-3 py-2 border text-sm"
                         placeholder="Descrição (opcional)"
                         value={newAppDesc}
                         onChange={(e) => setNewAppDesc(e.target.value)}
                         style={{ borderColor: borderCol, background: theme === 'light' ? 'rgba(0,0,0,.035)' : 'rgba(255,255,255,.04)', color: textCol }}
                       />
+                      <input
+                        className="col-span-3 rounded-lg px-3 py-2 border text-sm"
+                        placeholder="URL (https://...)"
+                        value={newAppUrl}
+                        onChange={(e) => setNewAppUrl(e.target.value)}
+                        style={{ borderColor: borderCol, background: theme === 'light' ? 'rgba(0,0,0,.035)' : 'rgba(255,255,255,.04)', color: textCol }}
+                      />
+                    </div>
+                    <div className="mt-2">
                       <button
                         onClick={addApp}
                         disabled={!newAppName.trim()}
-                        className="col-span-1 inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 border text-sm hover:opacity-90 disabled:opacity-50"
+                        className="inline-flex items-center gap-2 rounded-lg px-3 py-2 border text-sm hover:opacity-90 disabled:opacity-50"
                         style={{ borderColor: borderCol }}
                         title="Adicionar app"
                       >
-                        <Plus className="h-4 w-4" />
+                        <Plus className="h-4 w-4" /> Adicionar
                       </button>
                     </div>
                   </div>

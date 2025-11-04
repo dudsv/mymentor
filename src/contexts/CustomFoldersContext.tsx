@@ -8,6 +8,7 @@ export interface CustomFolder {
     id: string;
     name: string;
     description: string;
+    url: string; // novo campo
   }>;
 }
 
@@ -17,7 +18,11 @@ interface CustomFoldersContextType {
   updateFolder: (id: string, patch: Partial<Pick<CustomFolder, 'name' | 'color'>>) => void;
   deleteFolder: (id: string) => void;
   addAppToFolder: (folderId: string, app: Omit<CustomFolder['apps'][0], 'id'>) => void;
-  updateAppInFolder: (folderId: string, appId: string, patch: Partial<Pick<CustomFolder['apps'][0], 'name' | 'description'>>) => void;
+  updateAppInFolder: (
+    folderId: string,
+    appId: string,
+    patch: Partial<Pick<CustomFolder['apps'][0], 'name' | 'description' | 'url'>>
+  ) => void;
   reorderApps: (folderId: string, from: number, to: number) => void;
   deleteAppFromFolder: (folderId: string, appId: string) => void;
 }
@@ -31,7 +36,21 @@ export function CustomFoldersProvider({ children }: { children: React.ReactNode 
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) return parsed as CustomFolder[];
+        if (Array.isArray(parsed)) {
+          // migração: garante 'url' em cada app
+          const migrated = parsed.map((f: any) => ({
+            ...f,
+            apps: Array.isArray(f?.apps)
+              ? f.apps.map((a: any) => ({
+                  id: a?.id ?? (crypto?.randomUUID?.() || String(Date.now())),
+                  name: String(a?.name ?? ''),
+                  description: String(a?.description ?? ''),
+                  url: String(a?.url ?? ''), // novo
+                }))
+              : [],
+          }));
+          return migrated as CustomFolder[];
+        }
       } catch {}
     }
     // fallback inicial

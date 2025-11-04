@@ -6,6 +6,12 @@ import { useLoading } from '@/contexts/LoadingContext';
 import { useCustomFolders } from '@/contexts/CustomFoldersContext';
 import FolderManagementModal from '@/components/FolderManagementModal';
 
+const getHref = (raw?: string) => {
+  const s = (raw || '').trim();
+  if (!s) return '';
+  return /^https?:\/\//i.test(s) ? s : `https://${s}`;
+};
+
 // Paleta
 const PRIMARY = "#7F22FE";
 // Logo (mock) para cards internos (Toolkit/Assistente)
@@ -125,7 +131,14 @@ function GestorTools(){
   const { theme } = useTheme();
   const { folders } = useCustomFolders();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
+
+  // helper: normaliza URL com protocolo
+  const getHref = (raw?: string) => {
+    const s = (raw || '').trim();
+    if (!s) return '';
+    return /^https?:\/\//i.test(s) ? s : `https://${s}`;
+  };
+
   // Pastas (abas) — ordem: Todas · HR · New Services · Finanças
   const FOLDERS = [
     { id: 'all', name: 'Todas' },
@@ -171,92 +184,111 @@ function GestorTools(){
           </button>
         </div>
 
-      {/* Abas / Pílulas de organização */}
-      <div className="flex flex-wrap items-center gap-2" data-testid="gestor-folders">
-        {allFolders.map((f) => {
-          const isCustom = !FOLDERS.find(base => base.id === f.id);
-          const isActive = folder === f.id;
+        {/* Abas / Pílulas de organização */}
+        <div className="flex flex-wrap items-center gap-2" data-testid="gestor-folders">
+          {allFolders.map((f) => {
+            const isCustom = !FOLDERS.find(base => base.id === f.id);
+            const isActive = folder === f.id;
+            
+            return (
+              <button
+                key={f.id}
+                data-testid={`folder-${f.id}`}
+                onClick={() => setFolder(f.id)}
+                aria-pressed={isActive}
+                className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium border transition-colors ${
+                  isActive 
+                    ? (isCustom ? 'border-[#7F22FE]/40 text-white font-bold' : 'border-[#7F22FE]/40 text-white font-bold')
+                    : 'border-[var(--chip-border)] text-[var(--chip-fg)] hover:bg-[var(--chip-hover)]'
+                }`}
+                style={
+                  isActive && isCustom 
+                    ? { backgroundColor: (f as any).color } 
+                    : isActive && !isCustom 
+                      ? { backgroundColor: 'rgba(127, 34, 254, 0.1)' }
+                      : undefined
+                }
+              >
+                {isCustom && (
+                  <div className="w-3 h-3 rounded" style={{ backgroundColor: (f as any).color }} />
+                )}
+                {f.name}
+              </button>
+            );
+          })}
           
-          return (
-            <button
-              key={f.id}
-              data-testid={`folder-${f.id}`}
-              onClick={() => setFolder(f.id)}
-              aria-pressed={isActive}
-              className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium border transition-colors ${
-                isActive 
-                  ? (isCustom ? 'border-[#7F22FE]/40 text-white font-bold' : 'border-[#7F22FE]/40 text-white font-bold')
-                  : 'border-[var(--chip-border)] text-[var(--chip-fg)] hover:bg-[var(--chip-hover)]'
-              }`}
-              style={
-                isActive && isCustom 
-                  ? { backgroundColor: (f as any).color } 
-                  : isActive && !isCustom 
-                    ? { backgroundColor: 'rgba(127, 34, 254, 0.1)' }
-                    : undefined
-              }
-            >
-              {isCustom && (
-                <div className="w-3 h-3 rounded" style={{ backgroundColor: (f as any).color }} />
-              )}
-              {f.name}
-            </button>
-          );
-        })}
-        
-        <button
-          type="button"
-          onClick={() => setIsModalOpen(true)}
-          data-testid="folder-add"
-          className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium border border-dashed border-[var(--panel-border)] text-[var(--muted)] hover:opacity-90"
-        >
-          <Plus className="h-3 w-3"/> Pasta
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            data-testid="folder-add"
+            className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium border border-dashed border-[var(--panel-border)] text-[var(--muted)] hover:opacity-90"
+          >
+            <Plus className="h-3 w-3"/> Pasta
+          </button>
+        </div>
 
-      {/* Lista de ferramentas (filtrada) ou apps customizados */}
-      <div className="space-y-2">
-        {isCustomFolder && displayApps.length === 0 && (
-          <div className="rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] p-4 text-sm text-[var(--muted)]">
-            <div className="font-medium text-[var(--fg)]">Nenhum app nesta pasta</div>
-            <div className="mt-1">Clique em <span className="text-[var(--fg)]">Adicionar</span> ou <span className="text-[var(--fg)]">+ Pasta</span> para gerenciar apps.</div>
-            <button onClick={() => setIsModalOpen(true)} className="mt-3 rounded-lg border border-[var(--panel-border)] px-3 py-1.5 text-xs hover:opacity-90">Gerenciar Apps</button>
-          </div>
-        )}
-        
-        {isCustomFolder && displayApps.map((app) => (
-          <div key={app.id} className="flex items-center justify-between rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] p-3">
-            <div>
-              <div className="text-sm font-medium text-[var(--fg)]">{app.name}</div>
-              <div className="text-xs text-[color:var(--muted-weak)]">{app.description}</div>
+        {/* Lista de ferramentas (filtrada) ou apps customizados */}
+        <div className="space-y-2">
+          {isCustomFolder && displayApps.length === 0 && (
+            <div className="rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] p-4 text-sm text-[var(--muted)]">
+              <div className="font-medium text-[var(--fg)]">Nenhum app nesta pasta</div>
+              <div className="mt-1">Clique em <span className="text-[var(--fg)]">Adicionar</span> ou <span className="text-[var(--fg)]">+ Pasta</span> para gerenciar apps.</div>
+              <button onClick={() => setIsModalOpen(true)} className="mt-3 rounded-lg border border-[var(--panel-border)] px-3 py-1.5 text-xs hover:opacity-90">Gerenciar Apps</button>
             </div>
-            <Tooltip text="App placeholder">
-              <button className="rounded-lg text-xs px-3 py-1.5 border border-[var(--panel-border)] hover:opacity-90">Abrir</button>
-            </Tooltip>
-          </div>
-        ))}
-        
-        {!isCustomFolder && currentTools.length === 0 && (
-          <div className="rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] p-4 text-sm text-[var(--muted)]">
-            <div className="font-medium text-[var(--fg)]">Nenhuma ferramenta nesta pasta</div>
-            <div className="mt-1">Use <span className="text-[var(--fg)]">Reorganizar</span> para mover ferramentas para esta pasta.</div>
-            <button disabled className="mt-3 cursor-not-allowed rounded-lg border border-[var(--panel-border)] px-3 py-1.5 text-xs opacity-50">Reorganizar</button>
-          </div>
-        )}
-        
-        {!isCustomFolder && currentTools.map((x)=> (
-          <div key={x.id} className="flex items-center justify-between rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] p-3">
-            <div>
-              <div className="text-sm font-medium text-[var(--fg)]">{x.t}</div>
-              <div className="text-xs text-[color:var(--muted-weak)]">{x.d}</div>
+          )}
+          
+          {isCustomFolder && displayApps.map((app) => {
+            const href = getHref(app.url);
+            return (
+              <div key={app.id} className="flex items-center justify-between rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] p-3">
+                <div>
+                  <div className="text-sm font-medium text-[var(--fg)]">{app.name}</div>
+                  <div className="text-xs text-[color:var(--muted-weak)]">{app.description || '—'}</div>
+                  {href && (
+                    <div className="text-[10px] text-[color:var(--muted-weak)] mt-1">
+                      {href}
+                    </div>
+                  )}
+                </div>
+                <a
+                  href={href || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => {
+                    if (!href) {
+                      e.preventDefault();
+                      alert('Defina uma URL válida para este app nas Ferramentas do Gestor.');
+                    }
+                  }}
+                  className="rounded-lg text-xs px-3 py-1.5 border border-[var(--panel-border)] hover:opacity-90"
+                >
+                  Abrir
+                </a>
+              </div>
+            );
+          })}
+          
+          {!isCustomFolder && currentTools.length === 0 && (
+            <div className="rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] p-4 text-sm text-[var(--muted)]">
+              <div className="font-medium text-[var(--fg)]">Nenhuma ferramenta nesta pasta</div>
+              <div className="mt-1">Use <span className="text-[var(--fg)]">Reorganizar</span> para mover ferramentas para esta pasta.</div>
+              <button disabled className="mt-3 cursor-not-allowed rounded-lg border border-[var(--panel-border)] px-3 py-1.5 text-xs opacity-50">Reorganizar</button>
             </div>
-            <Tooltip text="Mock">
-              <button className="rounded-lg text-xs px-3 py-1.5 border border-[var(--panel-border)] hover:opacity-90">Abrir</button>
-            </Tooltip>
-          </div>
-        ))}
-      </div>
-    </Card>
+          )}
+          
+          {!isCustomFolder && currentTools.map((x)=> (
+            <div key={x.id} className="flex items-center justify-between rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] p-3">
+              <div>
+                <div className="text-sm font-medium text-[var(--fg)]">{x.t}</div>
+                <div className="text-xs text-[color:var(--muted-weak)]">{x.d}</div>
+              </div>
+              <Tooltip text="Mock">
+                <button className="rounded-lg text-xs px-3 py-1.5 border border-[var(--panel-border)] hover:opacity-90">Abrir</button>
+              </Tooltip>
+            </div>
+          ))}
+        </div>
+      </Card>
     
     <FolderManagementModal 
       isOpen={isModalOpen} 
